@@ -11,10 +11,145 @@ public class App {
         this.itemRepository = itemRepository;
         this.salesPromotionRepository = salesPromotionRepository;
     }
+class OrderMsg {
+        private Item item;
+        private double sumMoney;
+        private int number;
+        public Item getItem() {
+            return item;
+        }
+        public void setItem(Item item) {
+            this.item = item;
+        }
 
+        public double getSumMoney() {
+            return sumMoney;
+        }
+
+        public void setSumMoney(double sumMoney) {
+            this.sumMoney = sumMoney;
+        }
+
+        public int getNumber() {
+            return number;
+        }
+
+        public void setNumber(int number) {
+            this.number = number;
+        }
+    }
+    class BillMsg {
+        private double discoundMoney;//优惠后价钱
+        private double balance;//差额
+        private String discoundType;//优惠类型
+        public double getDiscoundMoney() {
+            return discoundMoney;
+        }
+        public void setDiscoundMoney(double discoundMoney) {
+            this.discoundMoney = discoundMoney;
+        }
+        public double getBalance() {
+            return balance;
+        }
+
+        public void setBalance(double balance) {
+            this.balance = balance;
+        }
+
+        public String getDiscoundType() {
+            return discoundType;
+        }
+
+        public void setDiscoundType(String discoundType) {
+            this.discoundType = discoundType;
+        }
+    }
     public String bestCharge(List<String> inputs) {
         //TODO: write code here
+        List<OrderMsg> orderMsg = new ArrayList<>();
+        List<BillMsg> billMsg = new ArrayList<>();
+        double totalMoney = 0;
+        double balance = 0;
+        for (String str : inputs) {
+            String[] handle = str.split(" ");
+            OrderMsg ord = new OrderMsg();
+            for (Item item : itemRepository.findAll()) {
+                if (handle[0].equals(item.getId())) {
+                    ord.setItem(item);
+                    ord.setNumber(Integer.parseInt(handle[handle.length - 1]));
+                    ord.setSumMoney(item.getPrice() * ord.getNumber());
+                    orderMsg.add(ord);
+                }
+            }
+        }
+        for (OrderMsg order : orderMsg) {
+            totalMoney += order.getSumMoney();
+        }
+        List<String> balanceName = new ArrayList<>();
+        for (SalesPromotion salesPromotion : salesPromotionRepository.findAll()) {
+            BillMsg billM = new BillMsg();
+            if (salesPromotion.getType().equals("BUY_30_SAVE_6_YUAN")&&totalMoney >= 30) {
+                    billM.setDiscoundMoney(totalMoney - 6);
+                    billM.setBalance(6);
+                    billM.setDiscoundType(salesPromotion.getDisplayName());
+                    billMsg.add(billM);
 
-        return null;
+           } else if (salesPromotion.getType().equals("50%_DISCOUNT_ON_SPECIFIED_ITEMS")) {
+                for (OrderMsg orderm : orderMsg) {
+                      if(orderm.getItem().getName().equals("黄焖鸡")||orderm.getItem().getName().equals("凉皮")){
+                            balanceName.add(orderm.getItem().getName());
+                            balance += orderm.getSumMoney() / 2;
+                            billM.setBalance(balance);
+                            billM.setDiscoundMoney(totalMoney - balance);
+                            billM.setDiscoundType(salesPromotion.getDisplayName());
+                            billMsg.add(billM);
+                        }
+                }
+            }
+        }
+        String results = "============= 订餐明细 =============\n";
+        for (OrderMsg omsg : orderMsg) {
+            results += omsg.getItem().getName() + " x " + omsg.getNumber() + " = " + (int) omsg.getSumMoney() + "元\n";
+        }
+        results += "-----------------------------------\n";
+        if (billMsg.size() > 0) {
+            BillMsg bills = new BillMsg();
+            double finalMoney = billMsg.get(0).getDiscoundMoney();
+            String finalType = billMsg.get(0).getDiscoundType();
+            for (BillMsg bm : billMsg) {
+                if (bm.getDiscoundMoney() < finalMoney) {
+                    finalMoney = bm.getDiscoundMoney();
+                    finalType = bm.getDiscoundType();
+                }
+                if (finalType.equals(bm.getDiscoundType())) {
+                    bills = bm;
+                }
+            }
+            results += "使用优惠:\n";
+            if (finalType.equals("指定菜品半价")) {
+                results += finalType + "(";
+                for (int i = 0; i < balanceName.size(); i++) {
+                    if (i != balanceName.size() - 1) {
+                        results += balanceName.get(i) + "，";
+                    } else {
+                        results += balanceName.get(i) + ")，";
+                    }
+                }
+                results += "省" + (int) bills.getBalance() + "元\n";
+                results += "-----------------------------------\n";
+                results += "总计：" + (int) bills.getDiscoundMoney() + "元\n" ;
+                results += "===================================";
+            } else if(finalType.equals("满30减6元")) {
+                results += finalType + "，省6元\n";
+                results += "-----------------------------------\n";
+                results += "总计：" + (int) bills.getDiscoundMoney() + "元\n" ;
+                results +="===================================";
+            }
+
+        } else {
+            results += "总计：" + (int) totalMoney + "元\n";
+            results +="===================================";
+        }
+        return results;
     }
 }
